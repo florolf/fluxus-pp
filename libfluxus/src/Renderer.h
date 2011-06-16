@@ -172,6 +172,7 @@ public:
         void setPostprocessingShader(string* shaderSrc) { m_postprocessingShader = shaderSrc; }
         void clearPostprocessingShader() { m_postprocessingShader = (string*)NULL; }
 
+        void postprocessingInit();
 
 
 private:
@@ -179,7 +180,6 @@ private:
 	void PostRender();
 	void RenderLights(bool camera);
 	void RenderStencilShadows(unsigned int CamIndex);
-        void postprocessingInit();
 
         string* m_postprocessingShader;
         GLuint   m_postprocessingFBO;

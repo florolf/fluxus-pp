@@ -86,6 +86,7 @@ m_postprocessingInitDone(false)
 
 void Renderer::postprocessingInit()
 {
+	if(m_postprocessingInitDone) return;
   cerr<<"error bisect start"<<glGetError()<<endl;
         glActiveTexture(GL_TEXTURE0);
         glEnable(GL_TEXTURE_2D);
@@ -125,7 +126,7 @@ void Renderer::postprocessingInit()
         }
 
         cerr<<"error bisect end"<<glGetError()<<endl;
-        //    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,0);
+        glBindFramebuffer(GL_FRAMEBUFFER_EXT,0);
         //glBindTexture(GL_TEXTURE_2D,0);
         m_postprocessingInitDone = true;
 }
@@ -174,10 +175,6 @@ void Renderer::Render()
 	{
 		glClear(GL_ACCUM_BUFFER_BIT);
 	}
-        if (!m_postprocessingInitDone)
-          postprocessingInit();
-        glBindFramebuffer(GL_FRAMEBUFFER,m_postprocessingFBO);
-        cerr<<"FBO set to " << m_postprocessingFBO << endl;
         // exit(0);
 	for (unsigned int cam=0; cam<m_CameraVec.size(); cam++)
 	{
@@ -195,11 +192,15 @@ void Renderer::Render()
 		else
 		{
 			PreRender(cam);
+          postprocessingInit();
+     glBindFramebuffer(GL_FRAMEBUFFER,m_postprocessingFBO);
+        cerr<<"FBO set to " << m_postprocessingFBO << endl;
 			m_World.Render(&m_ShadowVolumeGen,cam);
                        
                            //glClear(GL_COLOR_BUFFER_BIT);
 
 			m_ImmediateMode.Render(cam);
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
 			PostRender();
 		}
 	}
@@ -441,7 +442,6 @@ void Renderer::PostRender()
 	PopState();
 
       
-        glBindFramebuffer(GL_FRAMEBUFFER,0);
     
         glActiveTexture(GL_TEXTURE0);
         glEnable(GL_TEXTURE_2D);
@@ -466,7 +466,7 @@ void main() {\
         shader->SetFloat("foo",0.5);
         glClearColor(0.0f, 0.3f, 0.4f, 1.0f);
         glColor3f(1.0f, 1.0f, 1.0f);
-        //  glClear(GL_COLOR_BUFFER_BIT);
+//          glClear(GL_COLOR_BUFFER_BIT);
         
         //        glDisable(GL_COLOR_MATERIAL);
         glDisable(GL_LIGHTING); 
@@ -495,7 +495,7 @@ void main() {\
         glEnable(GL_LIGHTING);
  
         GLSLShader::Unapply();
-        glBindFramebuffer(GL_FRAMEBUFFER,m_postprocessingFBO);
+//        glBindFramebuffer(GL_FRAMEBUFFER,m_postprocessingFBO);
         
 	if (m_FPSDisplay)
 	{
