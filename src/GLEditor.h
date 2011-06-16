@@ -20,6 +20,8 @@
 #include <string>
 #include "PolyGlyph.h"
 
+
+
 #ifndef __APPLE__
 #define GLEDITOR_DELETE 127
 #define GLEDITOR_BACKSPACE 8

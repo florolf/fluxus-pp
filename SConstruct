@@ -188,6 +188,7 @@ LibList = [["m", "math.h"],
 			["sndfile", "sndfile.h"],
 			["fftw3", "fftw3.h"],
 			["lo", "lo/lo.h"],
+			["ffi", "lo/lo.h"],
 			["GLEW", "GL/glew.h"],
 			["racket3m", "scheme.h"],
 			["jack", "jack/jack.h"]]

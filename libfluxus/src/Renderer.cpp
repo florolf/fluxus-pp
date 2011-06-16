@@ -29,6 +29,9 @@
 #include <stdio.h>
 #include <unistd.h>
 
+
+//#define DEBUG_TRACE
+
 using namespace Fluxus;
 
 //#define DEBUG_TRACE
@@ -69,15 +72,62 @@ m_MaskAlpha(true),
 m_Deadline(1/25.0f),
 m_FPSDisplay(false),
 m_Time(0),
-m_Delta(0)
+m_Delta(0),
+m_postprocessingInitDone(false)
 {
+
 	m_MainRenderer = main;
 
 	Clear();
-
 	// stop valgrind complaining
 	m_LastTime.tv_sec=0;
 	m_LastTime.tv_usec=0;
+}
+
+void Renderer::postprocessingInit()
+{
+  cerr<<"error bisect start"<<glGetError()<<endl;
+        glActiveTexture(GL_TEXTURE0);
+        glEnable(GL_TEXTURE_2D);
+        glGenFramebuffers(1, &m_postprocessingFBO);
+        glGenTextures(1, &m_postprocessingTexture);
+        std::cout << "foo:" << m_postprocessingFBO << " " << m_postprocessingTexture << std::endl;
+        printf("foobar\n");
+        fflush(stdout);
+        glBindTexture(GL_TEXTURE_2D, m_postprocessingTexture);
+        uint8_t data[1024*768*4];
+        for (long i = 0; i<1024*768*4; i++)
+          data[i] = i%252;
+     
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1024, 768, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmapEXT(GL_TEXTURE_2D);
+  
+        glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,m_postprocessingFBO);
+        GLuint depthBuffer;
+        glGenRenderbuffersEXT(1, &depthBuffer);
+        glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, depthBuffer);
+        glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, 1024, 768);
+        //  attach the renderbuffer to our framebuffer
+        glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, depthBuffer);
+
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, m_postprocessingTexture, 0);
+      
+        if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT)!=GL_FRAMEBUFFER_COMPLETE_EXT)
+          {
+            cerr<<"framebuffer incomplete :("<<endl;
+          } else{
+            cerr<<"framebuffer complete :)"<<endl;
+        }
+
+        cerr<<"error bisect end"<<glGetError()<<endl;
+        //    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,0);
+        //glBindTexture(GL_TEXTURE_2D,0);
+        m_postprocessingInitDone = true;
 }
 
 Renderer::~Renderer()
@@ -124,7 +174,11 @@ void Renderer::Render()
 	{
 		glClear(GL_ACCUM_BUFFER_BIT);
 	}
-
+        if (!m_postprocessingInitDone)
+          postprocessingInit();
+        glBindFramebuffer(GL_FRAMEBUFFER,m_postprocessingFBO);
+        cerr<<"FBO set to " << m_postprocessingFBO << endl;
+        // exit(0);
 	for (unsigned int cam=0; cam<m_CameraVec.size(); cam++)
 	{
 		// need to clear this even if we aren't using shadows
@@ -142,6 +196,9 @@ void Renderer::Render()
 		{
 			PreRender(cam);
 			m_World.Render(&m_ShadowVolumeGen,cam);
+                       
+                           //glClear(GL_COLOR_BUFFER_BIT);
+
 			m_ImmediateMode.Render(cam);
 			PostRender();
 		}
@@ -238,6 +295,10 @@ void Renderer::RenderStencilShadows(unsigned int CamIndex)
 
 void Renderer::PreRender(unsigned int CamIndex, bool PickMode)
 {
+   
+     // cerr<<"fbo:"<< m_postprocessingFBO<<endl;
+     //cerr<<"tex:"<< m_postprocessingTexture<<endl;
+
 	Camera &Cam = m_CameraVec[CamIndex];
     if (!m_Initialised || PickMode || Cam.NeedsInit())
     {
@@ -302,6 +363,9 @@ void Renderer::PreRender(unsigned int CamIndex, bool PickMode)
     	m_Initialised=true;
 	}
 	
+ 
+
+
 	if (!m_InitLights)
 	{
 		// builds the default camera light
@@ -375,7 +439,64 @@ void Renderer::PostRender()
 	glColorMask(true,true,true,true);
 	
 	PopState();
-	
+
+      
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
+    
+        glActiveTexture(GL_TEXTURE0);
+        glEnable(GL_TEXTURE_2D);
+        //glEnable(GL_COLOR_MATERIAL);
+        glBindTexture(GL_TEXTURE_2D, m_postprocessingTexture);
+        
+
+
+
+
+        string vert = POSTPROCESSING_SHADER_VERTEX_IDENTITY;
+        string frag = "\
+uniform sampler2D tex;\
+varying vec2 tc;\
+void main() {\
+  gl_FragColor = texture2D(tex,tc) + vec4(tc.x,tc.y,0,1.0);\
+}";
+        GLSLShader* shader = ShaderCache::Make(vert,frag);
+        shader->Apply();
+        //GLSLShader::Unapply();
+        shader->SetInt("tex",0);
+        shader->SetFloat("foo",0.5);
+        glClearColor(0.0f, 0.3f, 0.4f, 1.0f);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        //  glClear(GL_COLOR_BUFFER_BIT);
+        
+        //        glDisable(GL_COLOR_MATERIAL);
+        glDisable(GL_LIGHTING); 
+        glMatrixMode(GL_MODELVIEW);
+        glColor4f(1.0,1.0,1.0,1.0);
+        glPushMatrix();
+        glLoadIdentity();
+        glTranslatef(-1,-0.75,-1.0);
+        glScalef(0.5,0.5,0.5);
+        glBegin(GL_QUADS);
+        glMultiTexCoord2f(GL_TEXTURE0,0, 0);
+          glVertex3f(0,0,0);
+          
+          glMultiTexCoord2f(GL_TEXTURE0,1,0);
+          glVertex3f(2,0,0);
+          
+          glMultiTexCoord2f(GL_TEXTURE0,1,1);
+          glVertex3f(2,1.5,0);
+          
+          glMultiTexCoord2f(GL_TEXTURE0,0,1);
+          glVertex3f(0,1.5,0);
+        glEnd();
+        
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
+        glEnable(GL_LIGHTING);
+ 
+        GLSLShader::Unapply();
+        glBindFramebuffer(GL_FRAMEBUFFER,m_postprocessingFBO);
+        
 	if (m_FPSDisplay)
 	{
     	if (!(TimeCounter%FRAMES_PER_TIME))
@@ -675,12 +796,12 @@ void Renderer::DrawText(const string &Text)
 
 void Renderer::DrawBuffer(GLenum mode)
 {
-	glDrawBuffer(mode);
+  glDrawBuffer(mode);
 }
 
 void Renderer::ReadBuffer(GLenum mode)
 {
-	glReadBuffer(mode);
+  glReadBuffer(mode);
 }
 
 bool Renderer::SetStereoMode(stereo_mode_t mode)

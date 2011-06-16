@@ -34,6 +34,15 @@
 #define GL_POLYGON_OFFSET_EXT ((GLenum)0x8037)
 #endif
 
+#ifndef POSTPROCESSING_SHADER_VERTEX_IDENTITY
+#define POSTPROCESSING_SHADER_VERTEX_IDENTITY "\
+varying vec2 tc;\
+void main(){\
+   gl_Position = ftransform();\
+   tc = gl_MultiTexCoord0.st;\
+}"
+#endif
+
 using namespace std;
 
 namespace Fluxus
@@ -160,6 +169,9 @@ public:
 	void DrawBuffer(GLenum mode);
 	void ReadBuffer(GLenum mode);
 	///@}
+        void setPostprocessingShader(string* shaderSrc) { m_postprocessingShader = shaderSrc; }
+        void clearPostprocessingShader() { m_postprocessingShader = (string*)NULL; }
+
 
 
 private:
@@ -167,6 +179,13 @@ private:
 	void PostRender();
 	void RenderLights(bool camera);
 	void RenderStencilShadows(unsigned int CamIndex);
+        void postprocessingInit();
+
+        string* m_postprocessingShader;
+        GLuint   m_postprocessingFBO;
+        GLuint   m_postprocessingTexture;
+        bool m_postprocessingInitDone;
+
 
 	bool  m_MainRenderer;
 	bool  m_Initialised;
