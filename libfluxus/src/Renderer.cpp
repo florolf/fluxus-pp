@@ -501,7 +501,6 @@ void Renderer::PostRender()
         glPushMatrix();
         glLoadIdentity();
         glTranslatef(-1,-0.75,-1.0);
-        glScalef(0.5,0.5,0.5);
         glBegin(GL_QUADS);
         glMultiTexCoord2f(GL_TEXTURE0,0, 0);
           glVertex3f(0,0,0);
