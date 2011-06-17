@@ -126,7 +126,7 @@ void Renderer::postprocessingInit()
 uniform sampler2D tex;\
 varying vec2 tc;\
 void main() {\
-  gl_FragColor = texture2D(tex,tc) + vec4(tc.x,tc.y,0,1.0);\
+  gl_FragColor = texture2D(tex,tc);\
 }";
 	setPostprocessingShader(frag);
         m_postprocessingInitDone = true;
