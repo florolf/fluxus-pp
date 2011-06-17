@@ -2653,6 +2653,159 @@ Scheme_Object *pp_shader(int argc, Scheme_Object **argv)
   return scheme_void;
 }
 
+Scheme_Object *pp_shader_set(int argc, Scheme_Object **argv)
+{
+	Scheme_Object *paramvec = NULL;
+	Scheme_Object *listvec = NULL;
+	MZ_GC_DECL_REG(3);
+	MZ_GC_VAR_IN_REG(0, argv);
+	MZ_GC_VAR_IN_REG(1, paramvec);
+	MZ_GC_VAR_IN_REG(2, listvec);
+	MZ_GC_REG();
+
+	ArgCheck("pp-shader-set!", "l", argc, argv);
+
+	GLSLShader *shader=Engine::Get()->Renderer()->getPostprocessingShader();
+	if (shader!=NULL)
+	{
+		// vectors seem easier to handle than lists with this api
+		paramvec = scheme_list_to_vector(argv[0]);
+
+		// apply to set parameters
+		shader->Apply();
+
+		for (int n=0; n<SCHEME_VEC_SIZE(paramvec); n+=2)
+		{
+			if (SCHEME_CHAR_STRINGP(SCHEME_VEC_ELS(paramvec)[n]) && SCHEME_VEC_SIZE(paramvec)>n+1)
+			{
+				// get the parameter name
+				string param = StringFromScheme(SCHEME_VEC_ELS(paramvec)[n]);
+
+				if (SCHEME_NUMBERP(SCHEME_VEC_ELS(paramvec)[n+1]))
+				{
+					if (SCHEME_EXACT_INTEGERP(SCHEME_VEC_ELS(paramvec)[n+1]))
+					{
+						shader->SetInt(param,IntFromScheme(SCHEME_VEC_ELS(paramvec)[n+1]));
+					}
+					else
+					{
+						shader->SetFloat(param,(float)FloatFromScheme(SCHEME_VEC_ELS(paramvec)[n+1]));
+					}
+				}
+				else if (SCHEME_VECTORP(SCHEME_VEC_ELS(paramvec)[n+1]))
+				{
+					// set vec2f, vec3f, vec4f uniform variables
+					listvec = SCHEME_VEC_ELS(paramvec)[n + 1];
+					int vecsize = SCHEME_VEC_SIZE(listvec);
+
+					if ((2 <= vecsize) && (vecsize <= 4))
+					{
+						dVector vec;
+						FloatsFromScheme(listvec, vec.arr(), vecsize);
+						shader->SetVector(param, vec, vecsize);
+					}
+					else
+					{
+						Trace::Stream << "shader is expecting vector size 2, 3 or 4, but found " << vecsize <<
+							" for variable " << param << endl;
+					}
+				}
+				else if (SCHEME_LISTP(SCHEME_VEC_ELS(paramvec)[n+1]))
+				{
+					listvec = scheme_list_to_vector(SCHEME_VEC_ELS(paramvec)[n+1]);
+					unsigned int sz = SCHEME_VEC_SIZE(listvec);
+					if (sz>0)
+					{
+						if (SCHEME_NUMBERP(SCHEME_VEC_ELS(listvec)[0]))
+						{
+							if (SCHEME_EXACT_INTEGERP(SCHEME_VEC_ELS(listvec)[0]))
+							{
+								vector<int, FLX_ALLOC(int) > array;
+								for (unsigned int i=0; i<sz; i++)
+								{
+									if (!SCHEME_EXACT_INTEGERP(SCHEME_VEC_ELS(listvec)[i]))
+									{
+										Trace::Stream<<"found a dodgy element in a uniform array"<<endl;
+										break;
+									}
+									array.push_back(IntFromScheme(SCHEME_VEC_ELS(listvec)[i]));
+								}
+								shader->SetIntArray(param,array);
+							}
+							else
+							{
+								vector<float, FLX_ALLOC(float) > array;
+								for (unsigned int i=0; i<sz; i++)
+								{
+									if (!SCHEME_NUMBERP(SCHEME_VEC_ELS(listvec)[i]))
+									{
+										Trace::Stream<<"found a dodgy element in a uniform array"<<endl;
+										break;
+									}
+									array.push_back(FloatFromScheme(SCHEME_VEC_ELS(listvec)[i]));
+								}
+								shader->SetFloatArray(param,array);
+							}
+						}
+						else if (SCHEME_VECTORP(SCHEME_VEC_ELS(listvec)[0]))
+						{
+							if (SCHEME_VEC_SIZE(SCHEME_VEC_ELS(listvec)[0]) == 3)
+							{
+								vector<dVector, FLX_ALLOC(dVector) > array;
+								for (unsigned int i=0; i<sz; i++)
+								{
+									if (!SCHEME_VECTORP(SCHEME_VEC_ELS(listvec)[i]) ||
+										SCHEME_VEC_SIZE(SCHEME_VEC_ELS(listvec)[i]) != 3)
+									{
+										Trace::Stream<<"found a dodgy element in a uniform array"<<endl;
+										break;
+									}
+									dVector vec;
+									FloatsFromScheme(SCHEME_VEC_ELS(listvec)[i],vec.arr(),3);
+									array.push_back(vec);
+								}
+								shader->SetVectorArray(param,array);
+							}
+							else if (SCHEME_VEC_SIZE(SCHEME_VEC_ELS(listvec)[0]) == 4)
+							{
+								vector<dColour, FLX_ALLOC(dColour) > array;
+								for (unsigned int i=0; i<sz; i++)
+								{
+									if (!SCHEME_VECTORP(SCHEME_VEC_ELS(listvec)[i]) ||
+										SCHEME_VEC_SIZE(SCHEME_VEC_ELS(listvec)[i]) != 4)
+									{
+										Trace::Stream<<"found a dodgy element in a uniform array"<<endl;
+										break;
+									}
+									dColour vec;
+									FloatsFromScheme(SCHEME_VEC_ELS(listvec)[i],vec.arr(),4);
+									array.push_back(vec);
+								}
+								shader->SetColourArray(param,array);
+							}
+							else
+							{
+								Trace::Stream<<"shader has found a vector argument list of a strange size"<<endl;
+							}
+						}
+					}
+				}
+				else
+				{
+					Trace::Stream<<"shader has found an argument type it can't send, numbers and vectors, or lists of them only"<<endl;
+				}
+			}
+			else
+			{
+				Trace::Stream<<"shader has found a mal-formed parameter list"<<endl;
+			}
+		}
+		GLSLShader::Unapply();
+	}
+
+	MZ_GC_UNREG();
+	return scheme_void;
+}
 
 void GlobalStateFunctions::AddGlobals(Scheme_Env *env)
 {
@@ -2708,6 +2861,7 @@ void GlobalStateFunctions::AddGlobals(Scheme_Env *env)
 	scheme_add_global("set-cursor",scheme_make_prim_w_arity(set_cursor,"set-cursor",1,1), env);
 	scheme_add_global("set-full-screen", scheme_make_prim_w_arity(set_full_screen, "set-full-screen", 0, 0), env);
 	scheme_add_global("pp-shader", scheme_make_prim_w_arity(pp_shader, "pp-shader", 1, 1), env);
+	scheme_add_global("pp-shader-set!", scheme_make_prim_w_arity(pp_shader_set, "pp-shader-set!", 1, 1), env);
 
 	MZ_GC_UNREG();
 }

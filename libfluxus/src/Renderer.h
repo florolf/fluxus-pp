@@ -171,7 +171,7 @@ public:
 	///@}
 
 	bool setPostprocessingShader(string& fragShaderSrc);
-
+	GLSLShader* getPostprocessingShader() { return m_postprocessingShader; }
 
 private:
 	void PreRender(unsigned int CamIndex, bool PickMode=false);
