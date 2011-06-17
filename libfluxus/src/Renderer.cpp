@@ -86,15 +86,11 @@ m_postprocessingInitDone(false)
 
 void Renderer::postprocessingInit()
 {
-	if(m_postprocessingInitDone) return;
-  cerr<<"error bisect start"<<glGetError()<<endl;
         glActiveTexture(GL_TEXTURE0);
         glEnable(GL_TEXTURE_2D);
         glGenFramebuffers(1, &m_postprocessingFBO);
         glGenTextures(1, &m_postprocessingTexture);
-        std::cout << "foo:" << m_postprocessingFBO << " " << m_postprocessingTexture << std::endl;
-        printf("foobar\n");
-        fflush(stdout);
+
         glBindTexture(GL_TEXTURE_2D, m_postprocessingTexture);
         uint8_t data[1024*768*4];
         for (long i = 0; i<1024*768*4; i++)
@@ -125,10 +121,34 @@ void Renderer::postprocessingInit()
             cerr<<"framebuffer complete :)"<<endl;
         }
 
-        cerr<<"error bisect end"<<glGetError()<<endl;
         glBindFramebuffer(GL_FRAMEBUFFER_EXT,0);
-        //glBindTexture(GL_TEXTURE_2D,0);
+	string frag = "\
+uniform sampler2D tex;\
+varying vec2 tc;\
+void main() {\
+  gl_FragColor = texture2D(tex,tc) + vec4(tc.x,tc.y,0,1.0);\
+}";
+	setPostprocessingShader(frag);
         m_postprocessingInitDone = true;
+}
+
+bool Renderer::setPostprocessingShader(string& fragShaderSrc) {
+        GLSLShaderPair *pair = new GLSLShaderPair(false, POSTPROCESSING_SHADER_VERTEX_IDENTITY, fragShaderSrc);
+
+	// check for shader build failure
+	if(!pair->GetVertexShader() || !pair->GetFragmentShader()) return false;
+
+	GLSLShader *shader = new GLSLShader(*pair);
+	delete pair;
+
+	// check for shader link failure
+	if(!shader->IsValid()) {
+		delete shader;
+		return false;
+	}
+
+	m_postprocessingShader = shader;
+	return true;
 }
 
 Renderer::~Renderer()
@@ -192,9 +212,24 @@ void Renderer::Render()
 		else
 		{
 			PreRender(cam);
-          postprocessingInit();
+			if(!m_postprocessingInitDone)
+		          postprocessingInit();
      glBindFramebuffer(GL_FRAMEBUFFER,m_postprocessingFBO);
-        cerr<<"FBO set to " << m_postprocessingFBO << endl;
+	if (m_ClearFrame && !m_MotionBlur)
+	{
+		glClearColor(m_BGColour.r,m_BGColour.g,m_BGColour.b,m_BGColour.a);
+		glClear(GL_COLOR_BUFFER_BIT);
+	}
+
+	if (m_ClearZBuffer)
+	{
+		glClear(GL_DEPTH_BUFFER_BIT);
+	}
+
+	if (m_ClearAccum)
+	{
+		glClear(GL_ACCUM_BUFFER_BIT);
+	}
 			m_World.Render(&m_ShadowVolumeGen,cam);
                        
                            //glClear(GL_COLOR_BUFFER_BIT);
@@ -452,18 +487,9 @@ void Renderer::PostRender()
 
 
 
-        string vert = POSTPROCESSING_SHADER_VERTEX_IDENTITY;
-        string frag = "\
-uniform sampler2D tex;\
-varying vec2 tc;\
-void main() {\
-  gl_FragColor = texture2D(tex,tc) + vec4(tc.x,tc.y,0,1.0);\
-}";
-        GLSLShader* shader = ShaderCache::Make(vert,frag);
-        shader->Apply();
-        //GLSLShader::Unapply();
-        shader->SetInt("tex",0);
-        shader->SetFloat("foo",0.5);
+        m_postprocessingShader->Apply();
+        m_postprocessingShader->SetInt("tex",0);
+
         glClearColor(0.0f, 0.3f, 0.4f, 1.0f);
         glColor3f(1.0f, 1.0f, 1.0f);
 //          glClear(GL_COLOR_BUFFER_BIT);
@@ -495,7 +521,6 @@ void main() {\
         glEnable(GL_LIGHTING);
  
         GLSLShader::Unapply();
-//        glBindFramebuffer(GL_FRAMEBUFFER,m_postprocessingFBO);
         
 	if (m_FPSDisplay)
 	{

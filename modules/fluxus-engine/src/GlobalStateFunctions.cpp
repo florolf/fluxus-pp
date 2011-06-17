@@ -2640,6 +2640,20 @@ Scheme_Object *set_full_screen(int argc, Scheme_Object **argv)
   return scheme_void;
 }
 
+Scheme_Object *pp_shader(int argc, Scheme_Object **argv)
+{
+  DECL_ARGV();
+  ArgCheck("shader", "s", argc, argv);
+
+  string frag=StringFromScheme(argv[0]);
+
+  Engine::Get()->Renderer()->setPostprocessingShader(frag);
+
+  MZ_GC_UNREG();
+  return scheme_void;
+}
+
+
 void GlobalStateFunctions::AddGlobals(Scheme_Env *env)
 {
 	MZ_GC_DECL_REG(1);
@@ -2693,6 +2707,7 @@ void GlobalStateFunctions::AddGlobals(Scheme_Env *env)
 	scheme_add_global("print-info", scheme_make_prim_w_arity(print_info, "print-info", 0, 0), env);
 	scheme_add_global("set-cursor",scheme_make_prim_w_arity(set_cursor,"set-cursor",1,1), env);
 	scheme_add_global("set-full-screen", scheme_make_prim_w_arity(set_full_screen, "set-full-screen", 0, 0), env);
+	scheme_add_global("pp-shader", scheme_make_prim_w_arity(pp_shader, "pp-shader", 1, 1), env);
 
 	MZ_GC_UNREG();
 }

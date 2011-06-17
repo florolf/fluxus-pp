@@ -169,10 +169,8 @@ public:
 	void DrawBuffer(GLenum mode);
 	void ReadBuffer(GLenum mode);
 	///@}
-        void setPostprocessingShader(string* shaderSrc) { m_postprocessingShader = shaderSrc; }
-        void clearPostprocessingShader() { m_postprocessingShader = (string*)NULL; }
 
-        void postprocessingInit();
+	bool setPostprocessingShader(string& fragShaderSrc);
 
 
 private:
@@ -181,10 +179,11 @@ private:
 	void RenderLights(bool camera);
 	void RenderStencilShadows(unsigned int CamIndex);
 
-        string* m_postprocessingShader;
+        GLSLShader* m_postprocessingShader;
         GLuint   m_postprocessingFBO;
         GLuint   m_postprocessingTexture;
         bool m_postprocessingInitDone;
+        void postprocessingInit();
 
 
 	bool  m_MainRenderer;
