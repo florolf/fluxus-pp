@@ -2643,7 +2643,7 @@ Scheme_Object *set_full_screen(int argc, Scheme_Object **argv)
 Scheme_Object *pp_shader(int argc, Scheme_Object **argv)
 {
   DECL_ARGV();
-  ArgCheck("shader", "s", argc, argv);
+  ArgCheck("pp-shader", "s", argc, argv);
 
   string frag=StringFromScheme(argv[0]);
 
