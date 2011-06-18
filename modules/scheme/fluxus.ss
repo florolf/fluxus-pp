@@ -17,7 +17,8 @@
      "testing.ss"
      "tasks.ss"
      "shapes.ss"
-     "ffgl.ss")
+     "ffgl.ss"
+     "pp.ss")
 
 (provide
  (all-from-out "fluxus-modules.ss")
@@ -35,4 +36,5 @@
  (all-from-out "testing.ss")
  (all-from-out "tasks.ss")
  (all-from-out "shapes.ss")
- (all-from-out "ffgl.ss"))
+ (all-from-out "ffgl.ss")
+ (all-from-out "pp.ss"))
